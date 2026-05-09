@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Rabbit's Poker Room</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#040e07;--s1:#071510;--s2:#0b1f12;--s3:#0f2a18;--gold:#c8a84b;--gold2:#e6c96a;--gold3:rgba(200,168,75,0.14);--cream:#f0ead8;--c2:rgba(240,234,216,0.6);--c3:rgba(240,234,216,0.35);--g:#1a8a6e;--g2:#4db89a;--red:#9b2020;--r2:#e06060;--amb:#d4a017;--a2:#f0c040;--blue:#1c5fa0;--b2:#7ab0e0;--purp:#5a2d82;--p2:#b47fe0;--r:10px;--rs:7px;--sh:0 8px 32px rgba(0,0,0,0.6);}
@@ -483,7 +484,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
     <div class="stat-row" style="margin-bottom:0"><div class="stat-card"><div class="sc-l">Session Rake</div><div class="sc-v g" id="a-rake">$0.00</div></div><div class="stat-card"><div class="sc-l">High Hand Pot</div><div class="sc-v a" id="a-hh">$0.00</div></div><div class="stat-card"><div class="sc-l">Tournament House</div><div class="sc-v" id="a-t-house">$0.00</div></div><div class="stat-card"><div class="sc-l">Total Available</div><div class="sc-v g" id="a-total">$0.00</div></div></div>
     <div class="co-box mt8" id="admin-fin-detail" style="display:none"><div class="co-row"><span class="lbl">Charitable Organization</span><input type="text" id="charity-name" placeholder="Organization name" style="background:transparent;border:none;border-bottom:1px solid rgba(200,168,75,0.2);color:var(--cream);outline:none;font-family:'DM Sans',sans-serif;font-size:13px;width:200px;padding:2px 4px;"/></div><div class="co-row"><span class="lbl">Total</span><span class="val g" id="a-total-disp">$0.00</span></div><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-gold btn-sm" onclick="sendCharityEmail()">✉ Send Receipt</button><button class="btn btn-out btn-sm" onclick="document.getElementById('admin-fin-detail').style.display='none'">Cancel</button></div></div>
   </div>
-  <div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap"><button class="btn btn-gold btn-sm" onclick="openAddModal()">+ Create Player Login</button><button class="btn btn-amb btn-sm" onclick="openPendingModal()">⏳ Pending <span id="pending-cnt">0</span></button><button class="btn btn-purp btn-sm" onclick="openHostAppsModal()">🎩 Host Apps <span id="host-app-cnt">0</span></button></div>
+  <div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap"><button class="btn btn-gold btn-sm" onclick="openAddModal()">+ Create Player Login</button><button class="btn btn-amb btn-sm" onclick="openPendingModal()">⏳ Pending <span id="pending-cnt">0</span></button><button class="btn btn-purp btn-sm" onclick="openHostAppsModal()">🎩 Host Apps <span id="host-app-cnt">0</span></button><button class="btn btn-blue btn-sm" onclick="loadMembersFromDB();renderAdmin()" id="db-refresh-btn">🗄 Refresh Database</button></div>
   <div style="display:flex;gap:4px;margin-bottom:11px;flex-wrap:wrap"><button class="btn btn-sm" id="tab-members-btn" onclick="showMemberTab('members')" style="background:var(--gold);color:var(--bg)">Members</button><button class="btn btn-sm btn-out" id="tab-hosts-btn" onclick="showMemberTab('hosts')">Hosts</button><button class="btn btn-sm btn-out" id="tab-blocked-btn" onclick="showMemberTab('blocked')">Blocked/Probation</button></div>
   <div id="admin-list"><div class="empty">No members yet</div></div>
 </div>
@@ -646,7 +647,7 @@ function submitReg(){
   regSelfie=null;document.getElementById('rg-sph').style.display='block';document.getElementById('rg-sprev').style.display='none';document.getElementById('rg-sname').style.display='none';
   ['rg-fn','rg-ln','rg-nick','rg-ph','rg-em','rg-a1','rg-ci','rg-st','rg-zp'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('pending-cnt').textContent=pendingRegs.length;
-  toast('✓ Registration submitted! Admin will send your login.');setTimeout(()=>showAuth('login'),2200);
+  savePendingRegToDB({fn,ln,nick,ph,em,a1,ci:gv('rg-ci').trim(),st:gv('rg-st').trim(),zp:gv('rg-zp').trim()});toast('✓ Registration submitted! Admin will send your login.');setTimeout(()=>showAuth('login'),2200);
 }
 function submitHostApp(){
   const un=gv('hst-un').trim(),ph=gv('hst-ph').trim(),em=gv('hst-em').trim(),addr=gv('hst-addr').trim(),emp=gv('hst-emp').trim();
@@ -775,7 +776,7 @@ function submitHighlight(){
   const post={id:'HL'+Date.now(),cat,title,caption,photo:hlPhoto,date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),reactions:{fire:0,laugh:0,cry:0,shock:0},userReactions:{},winnerHand:cat==='badbeat'?gv('hl-winner-hand').trim():'',loserHand:cat==='badbeat'?gv('hl-loser-hand').trim():'',potSize:cat==='badbeat'?parseFloat(document.getElementById('hl-pot-size').value)||0:0,room:cat==='badbeat'?parseInt(gv('hl-room-sel')):null,potnName:cat==='potn'?gv('hl-potn-name').trim():''};
   highlights.unshift(post);
   if(cat==='potn'){setText('potn-name',post.potnName);setText('potn-reason',post.caption);setText('potn-date',post.date);const b=document.getElementById('potn-banner');if(b)b.style.display='block';}
-  hlPhoto=null;cm('modal-highlight');renderHighlights();toast('✓ Highlight posted! 🎬');
+  saveHighlightToDB(post);hlPhoto=null;cm('modal-highlight');renderHighlights();toast('✓ Highlight posted! 🎬');
 }
 function filterHL(cat){
   hlFilter=cat;
@@ -965,7 +966,7 @@ function createLogin(){
   const np={id:'PL'+Date.now(),username:uname,password:pw,mustChangePw:true,fn:pr?pr.fn:'',ln:pr?pr.ln:'',nick:pr?pr.nick:uname,ph:pr?pr.ph:'',em:pr?pr.em:'',a1:pr?pr.a1:'',ci:pr?pr.ci:'',st:pr?pr.st:'',zp:pr?pr.zp:'',photo:pr?pr.photo:null,room:roomIdx,seat,buyin,chips:buyin,addons:0,co:false,onRail:onRail,railRoom:onRail?roomIdx:null,status:'active',isHost:false,breaksUsed:0,onBreak:false,breakSecsLeft:0,createdAt:new Date().toLocaleString()};
   players.push(np);if(pr)pendingRegs=pendingRegs.filter(x=>x.id!==prId);document.getElementById('pending-cnt').textContent=pendingRegs.length;cm('modal-add');renderLobby();renderRoom();renderAdmin();
   if(np.em)gmailOpen(np.em,"Your Rabbit's Poker Room Login","Hi "+np.nick+",\n\nUsername: "+uname+"\nTemp Password: "+pw+"\n\nLogin at bostonpokerclub.amitureflops.com\nChange your password after first login.\n\nSee you at the table! 🐇");
-  toast('✓ '+np.nick+' created');}
+  saveMemberToDB(np);toast('✓ '+np.nick+' created · Saved to database');}
 
 /* ══ ADMIN FINANCIALS ══ */
 function updateAdminFin(){const total=sessionRake+hhPot+tournHouse;setText('a-rake','$'+sessionRake.toFixed(2));setText('a-hh','$'+hhPot.toFixed(2));setText('a-t-house','$'+tournHouse.toFixed(2));setText('a-total','$'+total.toFixed(2));setText('a-total-disp','$'+total.toFixed(2));}
@@ -1078,8 +1079,76 @@ function toast(msg,dur=3400){const t=document.getElementById('toast');t.textCont
 function pad(n){return String(n).padStart(2,'0');}
 function ts(){return new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});}
 
+/* ══ SUPABASE ══ */
+const SUPA_URL="https://iqmmjvncdssnaxjnnpvn.supabase.co";
+const SUPA_KEY="sb_publishable_xl7fk5OLulEmhqS88lkHNQ_bTY_TFcMosE";
+let db=null,dbReady=false;
+
+function initSupabase(){
+  try{
+    db=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+    dbReady=true;
+    console.log("Supabase connected");
+    loadMembersFromDB();
+    subscribeToMembers();
+  }catch(e){console.warn("Supabase offline",e);dbReady=false;}
+}
+
+async function loadMembersFromDB(){
+  if(!dbReady)return;
+  try{
+    const{data,error}=await db.from("members").select("*").order("created_at",{ascending:false});
+    if(error)throw error;
+    if(data&&data.length>0){
+      players=data.map(m=>({id:m.id,username:m.username,password:m.password,mustChangePw:m.must_change_pw,fn:m.first_name,ln:m.last_name,nick:m.nickname,ph:m.phone,em:m.email,a1:m.address,ci:m.city,st:m.state,zp:m.zip,photo:m.photo_url,room:0,seat:null,buyin:0,chips:0,addons:0,co:false,onRail:false,railRoom:null,status:m.status||"active",isHost:m.role==="host",breaksUsed:m.breaks_used||0,onBreak:false,breakSecsLeft:0,createdAt:m.created_at}));
+      renderLobby();if(currentUser&&currentUser.role==="admin")renderAdmin();
+      console.log(data.length+" members loaded");
+    }
+  }catch(e){console.warn("DB load error:",e);}
+}
+
+async function saveMemberToDB(p){
+  if(!dbReady)return;
+  try{
+    await db.from("members").upsert([{id:p.id,first_name:p.fn,last_name:p.ln,nickname:p.nick,phone:p.ph,email:p.em,address:p.a1,city:p.ci,state:p.st,zip:p.zp,username:p.username,password:p.password,role:p.isHost?"host":"player",status:p.status||"active",must_change_pw:p.mustChangePw,breaks_used:p.breaksUsed||0}]);
+  }catch(e){console.warn("Save member error:",e);}
+}
+
+async function updateMemberInDB(id,fields){
+  if(!dbReady)return;
+  try{await db.from("members").update(fields).eq("id",id);}catch(e){console.warn("Update error:",e);}
+}
+
+async function savePendingRegToDB(reg){
+  if(!dbReady)return false;
+  try{
+    const{error}=await db.from("members").insert([{first_name:reg.fn,last_name:reg.ln,nickname:reg.nick,phone:reg.ph,email:reg.em,address:reg.a1,city:reg.ci,state:reg.st,zip:reg.zp,username:reg.nick.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now().toString().slice(-4),password:"temp1234",role:"player",status:"pending",must_change_pw:true,breaks_used:0}]);
+    if(error)throw error;
+    return true;
+  }catch(e){console.warn("Save pending error:",e);return false;}
+}
+
+async function saveCashoutToDB(memberId,buyin,cashoutAmt,net){
+  if(!dbReady)return;
+  try{await db.from("cashouts").insert([{member_id:memberId,buyin,cashout_amount:cashoutAmt,net}]);}catch(e){console.warn("Cashout DB error:",e);}
+}
+
+async function saveHighlightToDB(post){
+  if(!dbReady)return;
+  try{await db.from("highlights").insert([{category:post.cat,title:post.title,caption:post.caption,winner_hand:post.winnerHand,loser_hand:post.loserHand,pot_size:post.potSize,player_name:post.potnName,posted_by:"admin"}]);}catch(e){console.warn("Highlight DB error:",e);}
+}
+
+function subscribeToMembers(){
+  if(!dbReady)return;
+  db.channel("members")
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"members"},p=>{toast("New registration: "+(p.new.nickname||p.new.username));loadMembersFromDB();})
+    .on("postgres_changes",{event:"UPDATE",schema:"public",table:"members"},()=>loadMembersFromDB())
+    .subscribe();
+}
+
 /* INIT */
 renderLobby();previewT();renderClock();
+initSupabase();
 </script>
 </body>
 </html>
