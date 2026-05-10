@@ -61,7 +61,7 @@ router.post('/auth/register', async (req, res) => {
   }
 
   const token = jwt.sign({ id: data.id, username: data.username, isAdmin: data.is_admin }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: data });
+  res.json({ token, user: { id: data.id, username: data.username, email: data.email, chips: data.chips, isAdmin: data.is_admin } });
 });
 
 router.post('/auth/login', async (req, res) => {

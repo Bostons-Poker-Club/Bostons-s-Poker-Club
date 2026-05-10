@@ -10,11 +10,26 @@ let jackpotData = null;
 
 document.getElementById('header-username').textContent = user.username;
 document.getElementById('header-chips').textContent = fmtChips(user.chips);
-if (user.isAdmin) {
+
+function applyAdminUI(isAdmin) {
+  if (!isAdmin) return;
   document.getElementById('admin-link').style.display = '';
   document.getElementById('create-table-btn').style.display = '';
   document.getElementById('create-tournament-btn').style.display = '';
 }
+
+// Apply immediately from cached user (JWT-derived)
+applyAdminUI(user.isAdmin);
+
+// Then confirm from API in case localStorage is stale
+apiFetch('/api/profile').then(profile => {
+  const isAdmin = !!(profile.is_admin || profile.isAdmin);
+  applyAdminUI(isAdmin);
+  // Keep localStorage in sync
+  const u = getUser();
+  if (u) { u.isAdmin = isAdmin; u.chips = profile.chips; localStorage.setItem('rp_user', JSON.stringify(u)); }
+  document.getElementById('header-chips').textContent = fmtChips(profile.chips);
+}).catch(() => {});
 
 loadTables();
 loadTournaments();

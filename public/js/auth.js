@@ -3,9 +3,24 @@
 const API = '';
 
 function getToken() { return localStorage.getItem('rp_token'); }
+
+function decodeJwt(token) {
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch { return {}; }
+}
+
 function getUser() {
   const u = localStorage.getItem('rp_user');
-  return u ? JSON.parse(u) : null;
+  const stored = u ? JSON.parse(u) : null;
+  if (!stored) return null;
+  // Always derive isAdmin from the JWT payload — source of truth
+  const token = getToken();
+  const jwt = token ? decodeJwt(token) : {};
+  return {
+    ...stored,
+    isAdmin: !!(jwt.isAdmin || stored.isAdmin || stored.is_admin)
+  };
 }
 function saveAuth(token, user) {
   localStorage.setItem('rp_token', token);
