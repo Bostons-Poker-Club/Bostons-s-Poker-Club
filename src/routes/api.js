@@ -9,11 +9,12 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
 // Local admin fallback — works without Supabase
+// Hash is bcrypt of 'admin123' — verified correct
 const LOCAL_ADMIN = {
   id: 'local-admin-000',
   username: process.env.ADMIN_USERNAME || 'admin',
   email: 'admin@rabbitspoker.com',
-  passwordHash: process.env.ADMIN_PASSWORD_HASH || '$2a$10$yYkfV4Gbu6UKuUwVDFYzi.ybE1mRiFVXyv3Jmd9JmLXsVNIiBGFnG',
+  passwordHash: process.env.ADMIN_PASSWORD_HASH || '$2a$10$IhLhqS2Zh/GR/BaWT6X5EOu.trshg1Nhuru73B6NBA353.zIWC5XG',
   chips: 999999,
   isAdmin: true
 };
@@ -68,15 +69,18 @@ router.post('/auth/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
   // Try Supabase first
-  const { data: user, error } = await supabaseAdmin
+  const { data: user, error: dbError } = await supabaseAdmin
     .from('users')
     .select('*')
     .eq('username', username)
     .single();
 
+  console.log(`[login] user=${username} db_found=${!!user} db_error=${dbError?.code || 'none'}`);
+
   if (user) {
     if (user.is_banned) return res.status(403).json({ error: 'Account is banned' });
     const valid = await bcrypt.compare(password, user.password_hash);
+    console.log(`[login] db bcrypt valid=${valid}`);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: user.id, username: user.username, isAdmin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({ token, user: { id: user.id, username: user.username, email: user.email, chips: user.chips, isAdmin: user.is_admin } });
@@ -85,12 +89,45 @@ router.post('/auth/login', async (req, res) => {
   // Supabase unavailable or user not found — fall back to local admin bypass
   if (username === LOCAL_ADMIN.username) {
     const valid = await bcrypt.compare(password, LOCAL_ADMIN.passwordHash);
+    console.log(`[login] local bypass bcrypt valid=${valid}`);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: LOCAL_ADMIN.id, username: LOCAL_ADMIN.username, isAdmin: true }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({ token, user: { id: LOCAL_ADMIN.id, username: LOCAL_ADMIN.username, email: LOCAL_ADMIN.email, chips: LOCAL_ADMIN.chips, isAdmin: true } });
   }
 
   return res.status(401).json({ error: 'Invalid credentials' });
+});
+
+// ─── Health / Diagnostics ───────────────────────────────────────────────────
+
+router.get('/health', async (req, res) => {
+  const supabaseUrl = process.env.SUPABASE_URL || 'NOT SET';
+  const hasAnonKey  = !!process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_ANON_KEY !== 'placeholder';
+  const hasSvcKey   = !!process.env.SUPABASE_SERVICE_KEY && process.env.SUPABASE_SERVICE_KEY !== 'placeholder';
+  const hasJwt      = !!process.env.JWT_SECRET && process.env.JWT_SECRET !== 'dev-secret-change-me';
+
+  let dbStatus = 'untested';
+  let userCount = null;
+  try {
+    const { count, error } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+    dbStatus = error ? `error: ${error.message}` : 'connected';
+    userCount = count;
+  } catch (e) {
+    dbStatus = `exception: ${e.message}`;
+  }
+
+  res.json({
+    status: 'ok',
+    supabaseUrl: supabaseUrl.replace(/https?:\/\//, '').split('.')[0] + '.supabase.co',
+    hasAnonKey,
+    hasSvcKey,
+    hasJwt,
+    db: dbStatus,
+    userCount,
+    nodeVersion: process.version
+  });
 });
 
 // ─── Profile ────────────────────────────────────────────────────────────────

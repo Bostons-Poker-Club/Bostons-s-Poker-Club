@@ -19,8 +19,8 @@ async function main() {
   const password = 'admin123';
   const email    = 'admin@rabbitspoker.com';
 
-  console.log('Hashing password…');
-  const password_hash = await bcrypt.hash(password, 10);
+  // Use a fixed pre-verified hash so DB and local bypass always match
+  const password_hash = '$2a$10$IhLhqS2Zh/GR/BaWT6X5EOu.trshg1Nhuru73B6NBA353.zIWC5XG';
 
   console.log('Upserting admin user…');
   const { data, error } = await supabase
