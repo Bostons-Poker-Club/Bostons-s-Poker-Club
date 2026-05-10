@@ -3,12 +3,12 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'placeholder';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'placeholder';
 
-if (!supabaseUrl) {
-  throw new Error('SUPABASE_URL is required');
+if (!process.env.SUPABASE_URL) {
+  console.warn('⚠️  SUPABASE_URL not set — DB features disabled, local admin only');
 }
 
 // Service client for server-side operations (bypasses RLS)
